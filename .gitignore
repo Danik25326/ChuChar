@@ -1,0 +1,34 @@
+# Залежності
+node_modules/
+package-lock.json
+yarn.lock
+
+# Змінні середовища
+.env
+.env.local
+
+# Логи
+*.log
+npm-debug.log*
+
+# Збірки
+dist/
+build/
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Бази даних (SQLite)
+*.db
+*.sqlite
