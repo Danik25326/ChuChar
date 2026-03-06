@@ -19,6 +19,10 @@ const io = socketIo(server, {
 
 // Middleware
 app.use(cors());
+// Простий маршрут для перевірки роботи сервера (healthcheck)
+app.get('/', (req, res) => {
+  res.send('ChuChar backend is running!');
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
