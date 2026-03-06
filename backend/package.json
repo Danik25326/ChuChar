@@ -1,0 +1,24 @@
+{
+  "name": "chuchar-backend",
+  "version": "1.0.0",
+  "description": "Backend for ChuChar messenger",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.5.4",
+    "jsonwebtoken": "^9.0.0",
+    "bcryptjs": "^2.4.3",
+    "sqlite3": "^5.1.4",
+    "sqlite": "^5.1.1",
+    "dotenv": "^16.0.3",
+    "cors": "^2.8.5",
+    "openai": "^3.2.1"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.20"
+  }
+}
