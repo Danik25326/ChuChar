@@ -12,6 +12,8 @@ export default function Chat() {
   const [input, setInput] = useState('');
   const [chatInfo, setChatInfo] = useState(null);
   const [members, setMembers] = useState([]);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const fileInputRef = useRef();
   const socketRef = useRef();
   const messagesEndRef = useRef();
   const { user } = useContext(AuthContext);
@@ -85,8 +87,74 @@ export default function Chat() {
   const sendMessage = (e) => {
     e.preventDefault();
     if (!input.trim()) return;
-    socketRef.current.emit('send-message', { chatId, content: input });
+    socketRef.current.emit('send-message', { chatId, type: 'text', content: input });
     setInput('');
+  };
+
+  const handleFileSelect = (e) => {
+    setSelectedFile(e.target.files[0]);
+  };
+
+  const uploadFile = async () => {
+    if (!selectedFile) return;
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.post('/api/upload', formData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      const fileType = selectedFile.type.startsWith('image/') ? 'image' : 'video';
+      socketRef.current.emit('send-message', {
+        chatId,
+        type: fileType,
+        content: res.data.url
+      });
+
+      setSelectedFile(null);
+      fileInputRef.current.value = '';
+    } catch (err) {
+      alert('Помилка завантаження файлу');
+      console.error(err);
+    }
+  };
+
+  const renderMessage = (msg) => {
+    const isMine = msg.userId === user?.id;
+    return (
+      <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+        <div className={`max-w-xs ${isMine ? 'chat-bubble-out' : 'chat-bubble-in'}`}>
+          {!isMine && <p className="text-xs text-neon-blue mb-1">{msg.username}</p>}
+          
+          {msg.type === 'text' && (
+            <p className="break-words">{msg.content}</p>
+          )}
+          {msg.type === 'image' && (
+            <img 
+              src={msg.content} 
+              alt="Зображення" 
+              className="max-w-full rounded cursor-pointer"
+              onClick={() => window.open(msg.content, '_blank')}
+            />
+          )}
+          {msg.type === 'video' && (
+            <video controls className="max-w-full rounded">
+              <source src={msg.content} />
+            </video>
+          )}
+          
+          <p className="text-xs text-right text-neon-text-secondary mt-1">
+            {format(new Date(msg.createdAt), 'HH:mm', { locale: uk })}
+          </p>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -117,37 +185,57 @@ export default function Chat() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {messages.map(msg => {
-            const isMine = msg.userId === user?.id;
-            return (
-              <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-xs ${isMine ? 'chat-bubble-out' : 'chat-bubble-in'}`}>
-                  {!isMine && <p className="text-xs text-neon-blue mb-1">{msg.username}</p>}
-                  <p className="break-words">{msg.content}</p>
-                  <p className="text-xs text-right text-neon-text-secondary mt-1">
-                    {format(new Date(msg.createdAt), 'HH:mm', { locale: uk })}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
+          {messages.map(renderMessage)}
           <div ref={messagesEndRef} />
         </div>
 
-        <form onSubmit={sendMessage} className="p-4 border-t border-neon-border flex items-center space-x-2">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Напишіть повідомлення..."
-            className="input-primary flex-1"
-          />
-          <button type="submit" className="bg-neon-blue hover:bg-blue-600 text-white p-3 rounded-lg transition">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-            </svg>
-          </button>
-        </form>
+        {/* Форма відправки повідомлень з можливістю вибору файлу */}
+        <div className="p-4 border-t border-neon-border">
+          {selectedFile && (
+            <div className="mb-2 flex items-center justify-between bg-neon-card p-2 rounded">
+              <span className="text-sm truncate">{selectedFile.name}</span>
+              <button
+                onClick={uploadFile}
+                className="bg-neon-blue text-white px-3 py-1 rounded text-sm"
+              >
+                Завантажити
+              </button>
+            </div>
+          )}
+          
+          <form onSubmit={sendMessage} className="flex items-center space-x-2">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Напишіть повідомлення..."
+              className="input-primary flex-1"
+            />
+            
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              accept="image/*,video/*"
+              className="hidden"
+              id="file-upload"
+            />
+            <label
+              htmlFor="file-upload"
+              className="bg-neon-hover hover:bg-neon-card text-white p-3 rounded-lg transition cursor-pointer"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+              </svg>
+            </label>
+            
+            <button type="submit" className="bg-neon-blue hover:bg-blue-600 text-white p-3 rounded-lg transition">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+              </svg>
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
