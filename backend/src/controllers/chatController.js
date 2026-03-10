@@ -3,48 +3,43 @@ async function createChat(req, res) {
   const userId = req.user.id;
   const db = req.db;
 
-  // Для особистого чату memberIds має бути [id_іншого_користувача]
   if (!isGroup && (!memberIds || memberIds.length !== 1)) {
     return res.status(400).json({ error: 'Personal chat requires exactly one other user' });
   }
 
   try {
-    // Якщо це особистий чат, перевіримо, чи він уже існує
+    // Якщо особистий чат, перевіряємо, чи вже існує
     if (!isGroup) {
       const otherUserId = memberIds[0];
-      // Шукаємо спільний чат між userId та otherUserId, який не є групою
-      const existing = await db.query(
+      const existing = await db.get(
         `SELECT c.id FROM chats c
          JOIN chat_members cm1 ON c.id = cm1.chat_id
          JOIN chat_members cm2 ON c.id = cm2.chat_id
-         WHERE c.is_group = false AND cm1.user_id = $1 AND cm2.user_id = $2`,
-        [userId, otherUserId]
+         WHERE c.is_group = 0 AND cm1.user_id = ? AND cm2.user_id = ?`,
+        userId, otherUserId
       );
-      if (existing.rows.length > 0) {
-        return res.status(200).json({ chatId: existing.rows[0].id, exists: true });
+      if (existing) {
+        return res.status(200).json({ chatId: existing.id, exists: true });
       }
     }
 
-    // Створюємо чат
-    const chatResult = await db.query(
-      'INSERT INTO chats (name, is_group) VALUES ($1, $2) RETURNING id',
-      [name || null, isGroup || false]
+    const result = await db.run(
+      'INSERT INTO chats (name, is_group) VALUES (?, ?)',
+      name || null, isGroup ? 1 : 0
     );
-    const chatId = chatResult.rows[0].id;
+    const chatId = result.lastID;
 
-    // Додаємо творця
-    await db.query(
-      'INSERT INTO chat_members (chat_id, user_id) VALUES ($1, $2)',
-      [chatId, userId]
+    await db.run(
+      'INSERT INTO chat_members (chat_id, user_id) VALUES (?, ?)',
+      chatId, userId
     );
 
-    // Додаємо інших учасників
     if (memberIds && Array.isArray(memberIds)) {
       for (const memberId of memberIds) {
         if (memberId !== userId) {
-          await db.query(
-            'INSERT INTO chat_members (chat_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-            [chatId, memberId]
+          await db.run(
+            'INSERT INTO chat_members (chat_id, user_id) VALUES (?, ?)',
+            chatId, memberId
           );
         }
       }
@@ -62,14 +57,14 @@ async function getUserChats(req, res) {
   const db = req.db;
 
   try {
-    const chats = await db.query(
+    const chats = await db.all(
       `SELECT c.* FROM chats c
        JOIN chat_members cm ON c.id = cm.chat_id
-       WHERE cm.user_id = $1
+       WHERE cm.user_id = ?
        ORDER BY c.created_at DESC`,
-      [userId]
+      userId
     );
-    res.json(chats.rows);
+    res.json(chats);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -82,16 +77,16 @@ async function getChat(req, res) {
   const db = req.db;
 
   try {
-    const chat = await db.query(
+    const chat = await db.get(
       `SELECT c.* FROM chats c
        JOIN chat_members cm ON c.id = cm.chat_id
-       WHERE c.id = $1 AND cm.user_id = $2`,
-      [chatId, userId]
+       WHERE c.id = ? AND cm.user_id = ?`,
+      chatId, userId
     );
-    if (chat.rows.length === 0) {
+    if (!chat) {
       return res.status(404).json({ error: 'Chat not found' });
     }
-    res.json(chat.rows[0]);
+    res.json(chat);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -107,16 +102,16 @@ async function getChatMessages(req, res) {
     let query = `
       SELECT m.*, u.username FROM messages m
       JOIN users u ON m.user_id = u.id
-      WHERE m.chat_id = $1
+      WHERE m.chat_id = ?
       ORDER BY m.created_at ASC
     `;
     const params = [chatId];
     if (limit) {
-      query += ` LIMIT $2`;
+      query += ` LIMIT ?`;
       params.push(parseInt(limit));
     }
-    const messages = await db.query(query, params);
-    res.json(messages.rows);
+    const messages = await db.all(query, ...params);
+    res.json(messages);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -127,13 +122,13 @@ async function getChatMembers(req, res) {
   const { chatId } = req.params;
   const db = req.db;
   try {
-    const members = await db.query(
+    const members = await db.all(
       `SELECT u.id, u.username FROM users u
        JOIN chat_members cm ON u.id = cm.user_id
-       WHERE cm.chat_id = $1`,
-      [chatId]
+       WHERE cm.chat_id = ?`,
+      chatId
     );
-    res.json(members.rows);
+    res.json(members);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
