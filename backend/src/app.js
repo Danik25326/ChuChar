@@ -44,16 +44,8 @@ app.use(express.urlencoded({ extended: true }));
       res.send('ChuChar backend is running!');
     });
 
-    // Роздача статики веб-клієнта (якщо зібрано)
-    const clientBuildPath = path.join(__dirname, '../../web-client/dist');
-    app.use(express.static(clientBuildPath));
-
-    app.get('*', (req, res) => {
-      if (!req.path.startsWith('/api')) {
-        res.sendFile(path.join(clientBuildPath, 'index.html'));
-      } else {
-        res.status(404).json({ error: 'API route not found' });
-      }
+    app.get('/', (req, res) => {
+      res.send('ChuChar API is running. Use /api endpoints.');
     });
 
     setupSocket(io, db);
