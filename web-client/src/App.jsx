@@ -1,5 +1,5 @@
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Chats from './pages/Chats';
@@ -10,7 +10,7 @@ import axios from 'axios';
 // Встановлюємо базовий URL для всіх axios-запитів
 axios.defaults.baseURL = import.meta.env.VITE_API_URL || '';
 
-// Глобальний обробник помилок React
+// Компонент для перехоплення помилок (Error Boundary)
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
