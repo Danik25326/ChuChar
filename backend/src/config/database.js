@@ -1,60 +1,63 @@
-const sqlite3 = require('sqlite3');
-const { open } = require('sqlite');
-const path = require('path');
-const bcrypt = require('bcryptjs');
+const { Pool } = require('pg');
+
+let pool;
 
 async function initializeDatabase() {
-  const db = await open({
-    filename: process.env.DATABASE_PATH || path.join(__dirname, '../../data/chuchar.sqlite'),
-    driver: sqlite3.Database
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
   });
 
-  await db.exec(`
+  // Create tables if they don't exist
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      id SERIAL PRIMARY KEY,
+      username VARCHAR(255) UNIQUE NOT NULL,
+      password VARCHAR(255) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS chats (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT,
-      is_group BOOLEAN DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255),
+      is_group BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS chat_members (
-      chat_id INTEGER,
-      user_id INTEGER,
-      joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(chat_id) REFERENCES chats(id) ON DELETE CASCADE,
-      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+      chat_id INTEGER REFERENCES chats(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (chat_id, user_id)
     );
 
     CREATE TABLE IF NOT EXISTS messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      chat_id INTEGER NOT NULL,
-      user_id INTEGER NOT NULL,
+      id SERIAL PRIMARY KEY,
+      chat_id INTEGER NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       content TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(chat_id) REFERENCES chats(id) ON DELETE CASCADE,
-      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
-  const aiUser = await db.get('SELECT id FROM users WHERE id = 1');
-  if (!aiUser) {
+  // Create AI Assistant user if not exists (id=1)
+  const aiUser = await pool.query('SELECT id FROM users WHERE id = 1');
+  if (aiUser.rows.length === 0) {
+    const bcrypt = require('bcryptjs');
     const hashedPassword = await bcrypt.hash('ai_assistant', 10);
-    await db.run(
-      'INSERT INTO users (id, username, password) VALUES (1, ?, ?)',
-      'AI Assistant', hashedPassword
+    await pool.query(
+      'INSERT INTO users (id, username, password) VALUES (1, $1, $2)',
+      ['AI Assistant', hashedPassword]
     );
   }
 
-  console.log('Database initialized');
-  return db;
+  console.log('Database connected and initialized');
+  return pool;
 }
 
-module.exports = { initializeDatabase };
+function getDb() {
+  if (!pool) throw new Error('Database not initialized');
+  return pool;
+}
+
+module.exports = { initializeDatabase, getDb };
