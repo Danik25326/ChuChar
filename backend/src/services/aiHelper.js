@@ -5,9 +5,8 @@ const configuration = new Configuration({
 });
 const openai = new OpenAIApi(configuration);
 
-async function getAIResponse(userMessage, userId, db) {
+async function getAIResponse(chatId, userMessage, userId, db) {
   try {
-    // Виклик OpenAI API
     const completion = await openai.createChatCompletion({
       model: "gpt-3.5-turbo",
       messages: [{ role: "user", content: userMessage }],
@@ -15,8 +14,6 @@ async function getAIResponse(userMessage, userId, db) {
 
     const aiContent = completion.data.choices[0].message.content;
 
-    // Збереження відповіді ШІ в БД (як повідомлення від спеціального користувача, наприклад, id = 1 для ШІ)
-    // Припустимо, що ШІ має ID = 1 (потрібно створити такого користувача)
     const result = await db.run(
       'INSERT INTO messages (chat_id, user_id, content) VALUES (?, ?, ?)',
       chatId, 1, aiContent
@@ -33,6 +30,7 @@ async function getAIResponse(userMessage, userId, db) {
   } catch (error) {
     console.error('AI error:', error);
     return {
+      id: Date.now(),
       chatId,
       userId: 1,
       username: 'AI Assistant',
