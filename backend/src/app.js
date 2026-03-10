@@ -15,7 +15,7 @@ const { authenticateToken } = require('./middleware/auth');
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
-  cors: { origin: '*' } // В продакшені краще обмежити доменами
+  cors: { origin: '*' }
 });
 
 app.use(cors());
@@ -27,7 +27,6 @@ app.use(express.urlencoded({ extended: true }));
     const db = await initializeDatabase();
     console.log('Database connected');
 
-    // Додаємо db до запитів (через middleware)
     app.use((req, res, next) => {
       req.db = db;
       next();
@@ -35,7 +34,7 @@ app.use(express.urlencoded({ extended: true }));
 
     app.use('/api/auth', authRoutes);
     app.use('/api/users', userRoutes);
-    use('/api/chats', chatRoutes);
+    app.use('/api/chats', chatRoutes);
 
     app.get('/api/auth/me', authenticateToken, (req, res) => {
       res.json({ user: req.user });
