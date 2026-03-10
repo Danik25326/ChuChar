@@ -1,13 +1,12 @@
-const { Configuration, OpenAIApi } = require('openai');
+const Groq = require('groq-sdk');
 
-const configuration = new Configuration({
-  apiKey: process.env.OPENAI_API_KEY,
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY
 });
-const openai = new OpenAIApi(configuration);
 
 async function getAIResponse(chatId, userMessage, db, members) {
   try {
-    // Отримуємо останні 10 повідомлень для контексту
+    // Отримуємо останні повідомлення для контексту
     const history = await db.all(
       `SELECT m.*, u.username FROM messages m
        JOIN users u ON m.user_id = u.id
@@ -16,33 +15,35 @@ async function getAIResponse(chatId, userMessage, db, members) {
        LIMIT 10`,
       chatId
     );
-    history.reverse(); // хронологічний порядок
+    history.reverse();
 
-    // Формуємо повідомлення для OpenAI
+    // Формуємо повідомлення для Groq
     const messages = [
-      { role: "system", content: "Ти корисний асистент у месенджері. Відповідай мовою користувача." }
+      { role: "system", content: "Ти корисний асистент у месенджері. Відповідай мовою користувача. Якщо тобі надіслали файл, згадай про це у відповіді." }
     ];
-    
+
     history.forEach(msg => {
+      let content = msg.content;
+      if (msg.type !== 'text') {
+        content = `[${msg.type}] ${msg.original_filename || 'файл'}`;
+      }
       messages.push({
         role: msg.userId === 1 ? "assistant" : "user",
-        content: msg.content
+        content: content
       });
     });
 
-    // Додаємо поточне повідомлення, якщо воно не дублюється (останнє в історії)
-    if (history.length === 0 || history[history.length-1].content !== userMessage) {
-      messages.push({ role: "user", content: userMessage });
-    }
+    // Додаємо поточне повідомлення
+    messages.push({ role: "user", content: userMessage });
 
-    const completion = await openai.createChatCompletion({
-      model: "gpt-3.5-turbo",
+    const completion = await groq.chat.completions.create({
+      model: "openai/gpt-oss-120b", // або інша модель Groq
       messages: messages,
-      max_tokens: 500,
-      temperature: 0.7
+      temperature: 0.7,
+      max_tokens: 500
     });
 
-    const aiContent = completion.data.choices[0].message.content;
+    const aiContent = completion.choices[0].message.content;
 
     // Зберігаємо відповідь AI в БД
     const result = await db.run(
