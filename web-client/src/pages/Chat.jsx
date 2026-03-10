@@ -126,37 +126,61 @@ export default function Chat() {
     }
   };
 
-  const renderMessage = (msg) => {
-    const isMine = msg.userId === user?.id;
-    return (
-      <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-        <div className={`max-w-xs ${isMine ? 'chat-bubble-out' : 'chat-bubble-in'}`}>
-          {!isMine && <p className="text-xs text-neon-blue mb-1">{msg.username}</p>}
-          
-          {msg.type === 'text' && (
-            <p className="break-words">{msg.content}</p>
-          )}
-{msg.type === 'image' && (
-  <img 
-    src={`${apiUrl}${msg.content}`} 
-    alt="Зображення" 
-    className="max-w-full rounded cursor-pointer"
-    onClick={() => window.open(`${apiUrl}${msg.content}`, '_blank')}
-  />
-)}
-{msg.type === 'video' && (
-  <video controls className="max-w-full rounded">
-    <source src={`${apiUrl}${msg.content}`} />
-  </video>
-)}
-          
-          <p className="text-xs text-right text-neon-text-secondary mt-1">
-            {format(new Date(msg.createdAt), 'HH:mm', { locale: uk })}
-          </p>
-        </div>
-      </div>
-    );
+// У renderMessage додайте обробку для інших типів:
+const renderMessage = (msg) => {
+  const isMine = msg.userId === user?.id;
+  
+  const getFileIcon = (mime) => {
+    if (mime?.startsWith('image/')) return '🖼️';
+    if (mime?.startsWith('video/')) return '🎥';
+    if (mime?.includes('pdf')) return '📄';
+    if (mime?.includes('word') || mime?.includes('document')) return '📝';
+    if (mime?.includes('excel') || mime?.includes('sheet')) return '📊';
+    if (mime?.includes('presentation') || mime?.includes('powerpoint')) return '📽️';
+    return '📎';
   };
+
+  return (
+    <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+      <div className={`max-w-xs ${isMine ? 'chat-bubble-out' : 'chat-bubble-in'}`}>
+        {!isMine && <p className="text-xs text-neon-blue mb-1">{msg.username}</p>}
+        
+        {msg.type === 'text' && <p className="break-words">{msg.content}</p>}
+        
+        {msg.type === 'image' && (
+          <img 
+            src={`${apiUrl}${msg.content}`} 
+            alt="image" 
+            className="max-w-full rounded cursor-pointer"
+            onClick={() => window.open(`${apiUrl}${msg.content}`, '_blank')}
+          />
+        )}
+        
+        {msg.type === 'video' && (
+          <video controls className="max-w-full rounded">
+            <source src={`${apiUrl}${msg.content}`} />
+          </video>
+        )}
+        
+        {msg.type === 'file' && (
+          <a 
+            href={`${apiUrl}${msg.content}`} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center space-x-2 p-2 bg-neon-card rounded hover:bg-neon-hover transition"
+          >
+            <span className="text-2xl">{getFileIcon(msg.mime)}</span>
+            <span className="truncate">{msg.filename || 'Файл'}</span>
+          </a>
+        )}
+        
+        <p className="text-xs text-right text-neon-text-secondary mt-1">
+          {format(new Date(msg.createdAt), 'HH:mm', { locale: uk })}
+        </p>
+      </div>
+    </div>
+  );
+};
 
   return (
     <div className="flex h-screen bg-neon-dark">
