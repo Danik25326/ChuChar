@@ -96,35 +96,41 @@ export default function Chat() {
     setSelectedFile(e.target.files[0]);
   };
 
-  const uploadFile = async () => {
-    if (!selectedFile) return;
+const uploadFile = async () => {
+  if (!selectedFile) return;
 
-    const formData = new FormData();
-    formData.append('file', selectedFile);
+  const formData = new FormData();
+  formData.append('file', selectedFile);
 
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.post('/api/upload', formData, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+  try {
+    const token = localStorage.getItem('token');
+    const res = await axios.post('/api/upload', formData, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data'
+      }
+    });
 
-      const fileType = selectedFile.type.startsWith('image/') ? 'image' : 'video';
-      socketRef.current.emit('send-message', {
-        chatId,
-        type: fileType,
-        content: res.data.url
-      });
+    // Визначаємо тип за MIME
+    let fileType = 'file';
+    if (selectedFile.type.startsWith('image/')) fileType = 'image';
+    else if (selectedFile.type.startsWith('video/')) fileType = 'video';
 
-      setSelectedFile(null);
-      fileInputRef.current.value = '';
-    } catch (err) {
-      alert('Помилка завантаження файлу');
-      console.error(err);
-    }
-  };
+    socketRef.current.emit('send-message', {
+      chatId,
+      type: fileType,
+      content: res.data.url,
+      filename: res.data.filename,
+      mime: res.data.mimetype
+    });
+
+    setSelectedFile(null);
+    fileInputRef.current.value = '';
+  } catch (err) {
+    alert('Помилка завантаження файлу');
+    console.error(err);
+  }
+};
 
 // У renderMessage додайте обробку для інших типів:
 const renderMessage = (msg) => {
