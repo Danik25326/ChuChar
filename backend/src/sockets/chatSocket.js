@@ -17,46 +17,44 @@ function setupSocket(io, db) {
     console.log(`User ${socket.user.id} connected`);
 
     socket.on('join-chats', async (chatIds) => {
-      // Перевіряємо, чи користувач є учасником кожного чату
       for (const chatId of chatIds) {
-        const res = await db.query(
-          'SELECT 1 FROM chat_members WHERE chat_id = $1 AND user_id = $2',
-          [chatId, socket.user.id]
+        const member = await db.get(
+          'SELECT 1 FROM chat_members WHERE chat_id = ? AND user_id = ?',
+          chatId, socket.user.id
         );
-        if (res.rows.length > 0) {
+        if (member) {
           socket.join(`chat:${chatId}`);
         }
       }
     });
 
     socket.on('send-message', async ({ chatId, content }) => {
-      // Перевіряємо членство
-      const memberCheck = await db.query(
-        'SELECT 1 FROM chat_members WHERE chat_id = $1 AND user_id = $2',
-        [chatId, socket.user.id]
+      const member = await db.get(
+        'SELECT 1 FROM chat_members WHERE chat_id = ? AND user_id = ?',
+        chatId, socket.user.id
       );
-      if (memberCheck.rows.length === 0) {
+      if (!member) {
         socket.emit('error', 'You are not a member of this chat');
         return;
       }
 
       try {
-        const result = await db.query(
-          'INSERT INTO messages (chat_id, user_id, content) VALUES ($1, $2, $3) RETURNING id, created_at',
-          [chatId, socket.user.id, content]
+        const result = await db.run(
+          'INSERT INTO messages (chat_id, user_id, content) VALUES (?, ?, ?)',
+          chatId, socket.user.id, content
         );
+
         const message = {
-          id: result.rows[0].id,
+          id: result.lastID,
           chatId,
           userId: socket.user.id,
           username: socket.user.username,
           content,
-          createdAt: result.rows[0].created_at
+          createdAt: new Date().toISOString()
         };
 
         io.to(`chat:${chatId}`).emit('new-message', message);
 
-        // AI помічник (якщо потрібно)
         if (content.startsWith('/ai ')) {
           const aiService = require('../services/aiHelper');
           const aiReply = await aiService.getAIResponse(chatId, content.slice(4), socket.user.id, db);
