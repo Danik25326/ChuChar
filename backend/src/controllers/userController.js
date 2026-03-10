@@ -3,8 +3,7 @@ async function getUser(req, res) {
   const db = req.db;
 
   try {
-    const result = await db.query('SELECT id, username, created_at FROM users WHERE id = $1', [id]);
-    const user = result.rows[0];
+    const user = await db.get('SELECT id, username, created_at FROM users WHERE id = ?', id);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -21,11 +20,11 @@ async function searchUsers(req, res) {
 
   const db = req.db;
   try {
-    const result = await db.query(
-      'SELECT id, username FROM users WHERE username ILIKE $1 LIMIT 10',
+    const users = await db.all(
+      'SELECT id, username FROM users WHERE username LIKE ? LIMIT 10',
       [`%${q}%`]
     );
-    res.json(result.rows);
+    res.json(users);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
