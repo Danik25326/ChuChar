@@ -13,6 +13,8 @@ export default function Chat() {
   const [chatInfo, setChatInfo] = useState(null);
   const [members, setMembers] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
@@ -20,6 +22,9 @@ export default function Chat() {
   const socketRef = useRef();
   const messagesEndRef = useRef();
   const messagesContainerRef = useRef();
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingTimerRef = useRef(null);
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
   const apiUrl = import.meta.env.VITE_API_URL || '';
@@ -73,7 +78,6 @@ export default function Chat() {
     };
   }, [chatId, navigate]);
 
-  // Завантаження повідомлень з пагінацією
   const fetchMessages = async (reset = false) => {
     if (loading || (!hasMore && !reset)) return;
     setLoading(true);
@@ -139,16 +143,16 @@ export default function Chat() {
         }
       });
 
-      // Визначаємо тип за MIME
       let fileType = 'file';
       if (selectedFile.type.startsWith('image/')) fileType = 'image';
       else if (selectedFile.type.startsWith('video/')) fileType = 'video';
+      else if (selectedFile.type.startsWith('audio/')) fileType = 'audio';
 
       socketRef.current.emit('send-message', {
         chatId,
         type: fileType,
         content: res.data.url,
-        filename: res.data.filename,
+        original_filename: res.data.original_filename,
         mime: res.data.mimetype
       });
 
@@ -160,13 +164,60 @@ export default function Chat() {
     }
   };
 
-  const getFileIcon = (mime) => {
-    if (mime?.startsWith('image/')) return '🖼️';
-    if (mime?.startsWith('video/')) return '🎥';
-    if (mime?.includes('pdf')) return '📄';
-    if (mime?.includes('word') || mime?.includes('document')) return '📝';
-    if (mime?.includes('excel') || mime?.includes('sheet')) return '📊';
-    if (mime?.includes('presentation') || mime?.includes('powerpoint')) return '📽️';
+  // Запис голосу
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorderRef.current.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const file = new File([audioBlob], `voice-${Date.now()}.webm`, { type: 'audio/webm' });
+        setSelectedFile(file);
+        // Автоматично завантажуємо після зупинки
+        await uploadFile();
+      };
+
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error('Error accessing microphone:', err);
+      alert('Не вдалося отримати доступ до мікрофона');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      setIsRecording(false);
+      clearInterval(recordingTimerRef.current);
+    }
+  };
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  const getFileIcon = (msg) => {
+    if (msg.type === 'audio') return '🎤';
+    if (msg.mime?.startsWith('image/')) return '🖼️';
+    if (msg.mime?.startsWith('video/')) return '🎥';
+    if (msg.mime?.includes('pdf')) return '📄';
+    if (msg.mime?.includes('word') || msg.mime?.includes('document')) return '📝';
+    if (msg.mime?.includes('excel') || msg.mime?.includes('sheet')) return '📊';
+    if (msg.mime?.includes('presentation') || msg.mime?.includes('powerpoint')) return '📽️';
     return '📎';
   };
 
@@ -194,15 +245,21 @@ export default function Chat() {
             </video>
           )}
           
-          {msg.type === 'file' && (
+          {msg.type === 'audio' && (
+            <audio controls className="w-full">
+              <source src={`${apiUrl}${msg.content}`} />
+            </audio>
+          )}
+          
+          {(msg.type === 'file' || (msg.type !== 'text' && msg.type !== 'image' && msg.type !== 'video' && msg.type !== 'audio')) && (
             <a 
               href={`${apiUrl}${msg.content}`} 
               target="_blank" 
               rel="noopener noreferrer"
               className="flex items-center space-x-2 p-2 bg-neon-card rounded hover:bg-neon-hover transition"
             >
-              <span className="text-2xl">{getFileIcon(msg.mime)}</span>
-              <span className="truncate">{msg.filename || 'Файл'}</span>
+              <span className="text-2xl">{getFileIcon(msg)}</span>
+              <span className="truncate">{msg.original_filename || 'Файл'}</span>
             </a>
           )}
           
@@ -251,7 +308,7 @@ export default function Chat() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Форма відправки повідомлень з можливістю вибору файлу */}
+        {/* Форма відправки */}
         <div className="p-4 border-t border-neon-border">
           {selectedFile && (
             <div className="mb-2 flex items-center justify-between bg-neon-card p-2 rounded">
@@ -278,7 +335,7 @@ export default function Chat() {
               type="file"
               ref={fileInputRef}
               onChange={handleFileSelect}
-              accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+              accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
               className="hidden"
               id="file-upload"
             />
@@ -290,6 +347,31 @@ export default function Chat() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
               </svg>
             </label>
+
+            {isRecording ? (
+              <button
+                type="button"
+                onClick={stopRecording}
+                className="bg-red-500 hover:bg-red-600 text-white p-3 rounded-lg transition relative"
+              >
+                <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded">
+                  {formatTime(recordingTime)}
+                </span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
+                </svg>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={startRecording}
+                className="bg-neon-hover hover:bg-neon-card text-white p-3 rounded-lg transition"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.915A7.002 7.002 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.002 7.002 0 006 6.915V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.085z" clipRule="evenodd" />
+                </svg>
+              </button>
+            )}
             
             <button type="submit" className="bg-neon-blue hover:bg-blue-600 text-white p-3 rounded-lg transition">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
