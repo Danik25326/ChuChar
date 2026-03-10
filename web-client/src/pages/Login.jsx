@@ -23,33 +23,42 @@ export default function Login() {
   };
 
   return (
-    <div style={{ maxWidth: 400, margin: '50px auto' }}>
-      <h2>Вхід до ChuChar</h2>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <input
-            type="text"
-            placeholder="Ім'я користувача"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <input
-            type="password"
-            placeholder="Пароль"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
-        {error && <p style={{ color: 'red' }}>{error}</p>}
-        <button type="submit">Увійти</button>
-      </form>
-      <p>
-        Ще немає акаунта? <Link to="/register">Зареєструватись</Link>
-      </p>
+    <div className="min-h-screen flex items-center justify-center bg-neon-dark">
+      <div className="bg-neon-card p-8 rounded-2xl shadow-2xl w-full max-w-md border border-neon-border">
+        <h2 className="text-3xl font-bold text-center mb-8 text-neon-blue">ChuChar</h2>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <input
+              type="text"
+              placeholder="Ім'я користувача"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="input-primary"
+              required
+            />
+          </div>
+          <div>
+            <input
+              type="password"
+              placeholder="Пароль"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="input-primary"
+              required
+            />
+          </div>
+          {error && <p className="text-red-500 text-sm">{error}</p>}
+          <button type="submit" className="btn-primary">
+            Увійти
+          </button>
+        </form>
+        <p className="mt-6 text-center text-neon-text-secondary">
+          Ще немає акаунта?{' '}
+          <Link to="/register" className="text-neon-blue hover:underline">
+            Зареєструватись
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
