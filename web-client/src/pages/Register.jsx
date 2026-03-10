@@ -28,42 +28,52 @@ export default function Register() {
   };
 
   return (
-    <div style={{ maxWidth: 400, margin: '50px auto' }}>
-      <h2>Реєстрація в ChuChar</h2>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <input
-            type="text"
-            placeholder="Ім'я користувача"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <input
-            type="password"
-            placeholder="Пароль"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <input
-            type="password"
-            placeholder="Підтвердьте пароль"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
-          />
-        </div>
-        {error && <p style={{ color: 'red' }}>{error}</p>}
-        <button type="submit">Зареєструватись</button>
-      </form>
-      <p>
-        Вже є акаунт? <Link to="/login">Увійти</Link>
-      </p>
+    <div className="min-h-screen flex items-center justify-center bg-neon-dark">
+      <div className="bg-neon-card p-8 rounded-2xl shadow-2xl w-full max-w-md border border-neon-border">
+        <h2 className="text-3xl font-bold text-center mb-8 text-neon-blue">Створити акаунт</h2>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <input
+              type="text"
+              placeholder="Ім'я користувача"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="input-primary"
+              required
+            />
+          </div>
+          <div>
+            <input
+              type="password"
+              placeholder="Пароль"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="input-primary"
+              required
+            />
+          </div>
+          <div>
+            <input
+              type="password"
+              placeholder="Підтвердьте пароль"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="input-primary"
+              required
+            />
+          </div>
+          {error && <p className="text-red-500 text-sm">{error}</p>}
+          <button type="submit" className="btn-primary">
+            Зареєструватись
+          </button>
+        </form>
+        <p className="mt-6 text-center text-neon-text-secondary">
+          Вже є акаунт?{' '}
+          <Link to="/login" className="text-neon-blue hover:underline">
+            Увійти
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
