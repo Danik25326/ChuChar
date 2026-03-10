@@ -28,7 +28,8 @@ function setupSocket(io, db) {
       }
     });
 
-    socket.on('send-message', async ({ chatId, content }) => {
+    socket.on('send-message', async ({ chatId, type = 'text', content }) => {
+      // Перевіряємо, чи користувач є учасником чату
       const member = await db.get(
         'SELECT 1 FROM chat_members WHERE chat_id = ? AND user_id = ?',
         chatId, socket.user.id
@@ -39,9 +40,10 @@ function setupSocket(io, db) {
       }
 
       try {
+        // Вставляємо повідомлення в БД
         const result = await db.run(
-          'INSERT INTO messages (chat_id, user_id, content) VALUES (?, ?, ?)',
-          chatId, socket.user.id, content
+          'INSERT INTO messages (chat_id, user_id, content, type) VALUES (?, ?, ?, ?)',
+          chatId, socket.user.id, content, type
         );
 
         const message = {
@@ -49,13 +51,16 @@ function setupSocket(io, db) {
           chatId,
           userId: socket.user.id,
           username: socket.user.username,
+          type,
           content,
           createdAt: new Date().toISOString()
         };
 
+        // Відправляємо всім учасникам чату
         io.to(`chat:${chatId}`).emit('new-message', message);
 
-        if (content.startsWith('/ai ')) {
+        // Якщо це текст і починається з /ai, викликаємо AI помічника
+        if (type === 'text' && content.startsWith('/ai ')) {
           const aiService = require('../services/aiHelper');
           const aiReply = await aiService.getAIResponse(chatId, content.slice(4), socket.user.id, db);
           io.to(`chat:${chatId}`).emit('new-message', aiReply);
