@@ -18,6 +18,7 @@ export default function Chat() {
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
+  const [error, setError] = useState(null);
   const fileInputRef = useRef();
   const socketRef = useRef();
   const messagesEndRef = useRef();
@@ -44,6 +45,7 @@ export default function Chat() {
 
     socketRef.current.on('error', (err) => {
       console.error('Socket error:', err);
+      setError(err);
       alert(err);
     });
 
@@ -56,6 +58,7 @@ export default function Chat() {
         });
         setChatInfo(res.data);
       } catch (err) {
+        console.error(err);
         navigate('/chats');
       }
     };
@@ -222,54 +225,84 @@ export default function Chat() {
   };
 
   const renderMessage = (msg) => {
-    const isMine = msg.userId === user?.id;
+    // Захист від undefined полів
+    const safeMsg = {
+      ...msg,
+      original_filename: msg.original_filename || 'Файл',
+      mime: msg.mime || '',
+      content: msg.content || '',
+      type: msg.type || 'text',
+      username: msg.username || 'Користувач'
+    };
+
+    const isMine = safeMsg.userId === user?.id;
     return (
-      <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+      <div key={safeMsg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
         <div className={`max-w-xs ${isMine ? 'chat-bubble-out' : 'chat-bubble-in'}`}>
-          {!isMine && <p className="text-xs text-neon-blue mb-1">{msg.username}</p>}
+          {!isMine && <p className="text-xs text-neon-blue mb-1">{safeMsg.username}</p>}
           
-          {msg.type === 'text' && <p className="break-words">{msg.content}</p>}
+          {safeMsg.type === 'text' && <p className="break-words">{safeMsg.content}</p>}
           
-          {msg.type === 'image' && (
+          {safeMsg.type === 'image' && safeMsg.content && (
             <img 
-              src={`${apiUrl}${msg.content}`} 
+              src={`${apiUrl}${safeMsg.content}`} 
               alt="Зображення" 
               className="max-w-full rounded cursor-pointer"
-              onClick={() => window.open(`${apiUrl}${msg.content}`, '_blank')}
+              onClick={() => window.open(`${apiUrl}${safeMsg.content}`, '_blank')}
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = 'https://via.placeholder.com/150?text=Помилка+завантаження';
+              }}
             />
           )}
           
-          {msg.type === 'video' && (
+          {safeMsg.type === 'video' && safeMsg.content && (
             <video controls className="max-w-full rounded">
-              <source src={`${apiUrl}${msg.content}`} />
+              <source src={`${apiUrl}${safeMsg.content}`} />
             </video>
           )}
           
-          {msg.type === 'audio' && (
+          {safeMsg.type === 'audio' && safeMsg.content && (
             <audio controls className="w-full">
-              <source src={`${apiUrl}${msg.content}`} />
+              <source src={`${apiUrl}${safeMsg.content}`} />
             </audio>
           )}
           
-          {(msg.type === 'file' || (msg.type !== 'text' && msg.type !== 'image' && msg.type !== 'video' && msg.type !== 'audio')) && (
+          {(safeMsg.type === 'file' || (safeMsg.type !== 'text' && safeMsg.type !== 'image' && safeMsg.type !== 'video' && safeMsg.type !== 'audio')) && safeMsg.content && (
             <a 
-              href={`${apiUrl}${msg.content}`} 
+              href={`${apiUrl}${safeMsg.content}`} 
               target="_blank" 
               rel="noopener noreferrer"
               className="flex items-center space-x-2 p-2 bg-neon-card rounded hover:bg-neon-hover transition"
             >
-              <span className="text-2xl">{getFileIcon(msg)}</span>
-              <span className="truncate">{msg.original_filename || 'Файл'}</span>
+              <span className="text-2xl">{getFileIcon(safeMsg)}</span>
+              <span className="truncate">{safeMsg.original_filename}</span>
             </a>
           )}
           
           <p className="text-xs text-right text-neon-text-secondary mt-1">
-            {format(new Date(msg.createdAt), 'HH:mm', { locale: uk })}
+            {safeMsg.createdAt ? format(new Date(safeMsg.createdAt), 'HH:mm', { locale: uk }) : ''}
           </p>
         </div>
       </div>
     );
   };
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-neon-dark">
+        <div className="text-center text-red-500">
+          <p>Сталася помилка: {error}</p>
+          <button 
+            onClick={() => navigate('/chats')}
+            className="mt-4 px-4 py-2 bg-neon-blue rounded text-white"
+          >
+            Повернутися до чатів
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-neon-dark">
