@@ -5,6 +5,7 @@ import Register from './pages/Register';
 import Chats from './pages/Chats';
 import Chat from './pages/Chat';
 import { AuthContext } from './context/AuthContext';
+import axios from 'axios';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -13,13 +14,22 @@ function App() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
-      // TODO: перевірити токен на бекенді
-      setUser({ token }); // тимчасово
+      axios.get('/api/auth/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then(res => {
+          setUser(res.data.user);
+        })
+        .catch(() => {
+          localStorage.removeItem('token');
+        })
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
-  if (loading) return <div>Завантаження...</div>;
+  if (loading) return <div className="flex items-center justify-center h-screen text-neon-blue">Завантаження...</div>;
 
   return (
     <AuthContext.Provider value={{ user, setUser }}>
