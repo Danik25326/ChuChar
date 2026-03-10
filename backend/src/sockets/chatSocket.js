@@ -16,15 +16,12 @@ function setupSocket(io, db) {
   io.on('connection', (socket) => {
     console.log(`User ${socket.user.id} connected`);
 
-    // Приєднання до кімнат чатів
     socket.on('join-chats', async (chatIds) => {
       chatIds.forEach(chatId => socket.join(`chat:${chatId}`));
     });
 
-    // Відправка повідомлення
     socket.on('send-message', async ({ chatId, content }) => {
       try {
-        // Збереження в БД
         const result = await db.run(
           'INSERT INTO messages (chat_id, user_id, content) VALUES (?, ?, ?)',
           chatId, socket.user.id, content
@@ -39,14 +36,11 @@ function setupSocket(io, db) {
           createdAt: new Date().toISOString()
         };
 
-        // Відправка всім у кімнаті
         io.to(`chat:${chatId}`).emit('new-message', message);
 
-        // Якщо це повідомлення для ШІ (наприклад, починається з "/ai")
         if (content.startsWith('/ai ')) {
           const aiService = require('../services/aiHelper');
-          const aiReply = await aiService.getAIResponse(content.slice(4), socket.user.id, db);
-          // Відправка відповіді ШІ як окремого повідомлення
+          const aiReply = await aiService.getAIResponse(chatId, content.slice(4), socket.user.id, db);
           io.to(`chat:${chatId}`).emit('new-message', aiReply);
         }
       } catch (err) {
