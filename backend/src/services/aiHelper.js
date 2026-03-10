@@ -14,18 +14,18 @@ async function getAIResponse(chatId, userMessage, userId, db) {
 
     const aiContent = completion.data.choices[0].message.content;
 
-    const result = await db.query(
-      'INSERT INTO messages (chat_id, user_id, content) VALUES ($1, $2, $3) RETURNING id, created_at',
-      [chatId, 1, aiContent]
+    const result = await db.run(
+      'INSERT INTO messages (chat_id, user_id, content) VALUES (?, ?, ?)',
+      chatId, 1, aiContent
     );
 
     return {
-      id: result.rows[0].id,
+      id: result.lastID,
       chatId,
       userId: 1,
       username: 'AI Assistant',
       content: aiContent,
-      createdAt: result.rows[0].created_at
+      createdAt: new Date().toISOString()
     };
   } catch (error) {
     console.error('AI error:', error);
