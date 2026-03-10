@@ -7,6 +7,10 @@ import Chat from './pages/Chat';
 import { AuthContext } from './context/AuthContext';
 import axios from 'axios';
 
+// Встановлюємо базовий URL для всіх axios-запитів
+// Якщо VITE_API_URL не задано (наприклад, локально), залишаємо порожнім (тоді запити йдуть на той самий домен)
+axios.defaults.baseURL = import.meta.env.VITE_API_URL || '';
+
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
