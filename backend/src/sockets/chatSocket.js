@@ -59,10 +59,21 @@ function setupSocket(io, db) {
         // Відправляємо всім учасникам чату
         io.to(`chat:${chatId}`).emit('new-message', message);
 
-        // Якщо це текст і починається з /ai, викликаємо AI помічника
+        // Перевіряємо, чи є в чаті AI Assistant (id=1) і чи повідомлення не від самого AI
+        const members = await db.all('SELECT user_id FROM chat_members WHERE chat_id = ?', chatId);
+        const hasAI = members.some(m => m.user_id === 1);
+        
+        if (hasAI && socket.user.id !== 1) {
+          // Викликаємо AI для відповіді
+          const aiService = require('../services/aiHelper');
+          const aiReply = await aiService.getAIResponse(chatId, content, db, members);
+          io.to(`chat:${chatId}`).emit('new-message', aiReply);
+        }
+        
+        // Також залишаємо стару логіку для команди /ai в будь-якому чаті
         if (type === 'text' && content.startsWith('/ai ')) {
           const aiService = require('../services/aiHelper');
-          const aiReply = await aiService.getAIResponse(chatId, content.slice(4), socket.user.id, db);
+          const aiReply = await aiService.getAIResponse(chatId, content.slice(4), db, members);
           io.to(`chat:${chatId}`).emit('new-message', aiReply);
         }
       } catch (err) {
