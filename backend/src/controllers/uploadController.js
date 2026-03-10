@@ -12,16 +12,18 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
+    // Зберігаємо унікальне ім'я, оригінальне зберігаємо окремо
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
+    const ext = path.extname(file.originalname);
+    cb(null, uniqueSuffix + ext);
   }
 });
 
-// Фільтр для допустимих типів файлів
+// Фільтр для допустимих типів файлів (розширено аудіо)
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|mp4|mov|avi|pdf|doc|docx|xls|xlsx|ppt|pptx|txt/;
+  const allowedTypes = /jpeg|jpg|png|gif|mp4|mov|avi|pdf|doc|docx|xls|xlsx|ppt|pptx|txt|mp3|wav|ogg|webm/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowedTypes.test(file.mimetype.split('/')[1]); // спрощено
+  const mimetype = allowedTypes.test(file.mimetype.split('/')[1]);
   
   if (mimetype || extname) {
     return cb(null, true);
@@ -42,10 +44,10 @@ async function uploadFile(req, res) {
   }
   
   const fileUrl = `/uploads/${req.file.filename}`;
-  // Повертаємо також оригінальну назву для відображення
   res.json({ 
     url: fileUrl,
-    filename: req.file.originalname,
+    original_filename: req.file.originalname,
+    stored_filename: req.file.filename,
     mimetype: req.file.mimetype,
     size: req.file.size
   });
