@@ -28,7 +28,7 @@ function setupSocket(io, db) {
       }
     });
 
-    socket.on('send-message', async ({ chatId, type = 'text', content }) => {
+    socket.on('send-message', async ({ chatId, type = 'text', content, filename, mime }) => {
       // Перевіряємо, чи користувач є учасником чату
       const member = await db.get(
         'SELECT 1 FROM chat_members WHERE chat_id = ? AND user_id = ?',
@@ -40,11 +40,19 @@ function setupSocket(io, db) {
       }
 
       try {
-        // Вставляємо повідомлення в БД
-        const result = await db.run(
-          'INSERT INTO messages (chat_id, user_id, content, type) VALUES (?, ?, ?, ?)',
-          chatId, socket.user.id, content, type
-        );
+        // Вставляємо повідомлення в БД (з додатковими полями для файлів)
+        let result;
+        if (type === 'file' || type === 'image' || type === 'video') {
+          result = await db.run(
+            'INSERT INTO messages (chat_id, user_id, content, type, filename, mime) VALUES (?, ?, ?, ?, ?, ?)',
+            chatId, socket.user.id, content, type, filename || null, mime || null
+          );
+        } else {
+          result = await db.run(
+            'INSERT INTO messages (chat_id, user_id, content, type) VALUES (?, ?, ?, ?)',
+            chatId, socket.user.id, content, type
+          );
+        }
 
         const message = {
           id: result.lastID,
@@ -53,6 +61,8 @@ function setupSocket(io, db) {
           username: socket.user.username,
           type,
           content,
+          filename,
+          mime,
           createdAt: new Date().toISOString()
         };
 
@@ -63,7 +73,7 @@ function setupSocket(io, db) {
         const members = await db.all('SELECT user_id FROM chat_members WHERE chat_id = ?', chatId);
         const hasAI = members.some(m => m.user_id === 1);
         
-        if (hasAI && socket.user.id !== 1) {
+        if (hasAI && socket.user.id !== 1 && type === 'text') {
           // Викликаємо AI для відповіді
           const aiService = require('../services/aiHelper');
           const aiReply = await aiService.getAIResponse(chatId, content, db, members);
