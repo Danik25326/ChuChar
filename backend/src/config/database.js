@@ -5,7 +5,6 @@ const bcrypt = require('bcryptjs');
 const fs = require('fs');
 
 async function initializeDatabase() {
-  // Переконуємося, що директорія data існує
   const dbDir = path.dirname(process.env.DATABASE_PATH || path.join(__dirname, '../../data/chuchar.sqlite'));
   if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true });
@@ -16,7 +15,6 @@ async function initializeDatabase() {
     driver: sqlite3.Database
   });
 
-  // Створюємо таблиці, якщо їх немає
   await db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +45,7 @@ async function initializeDatabase() {
       user_id INTEGER NOT NULL,
       content TEXT NOT NULL,
       type TEXT DEFAULT 'text',
-      filename TEXT,
+      original_filename TEXT,
       mime TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(chat_id) REFERENCES chats(id) ON DELETE CASCADE,
@@ -55,12 +53,11 @@ async function initializeDatabase() {
     );
   `);
 
-  // Якщо таблиця messages вже існувала без колонок filename/mime – додамо їх
+  // Додаємо відсутні колонки, якщо таблиця вже існувала
   try {
-    await db.get('SELECT filename FROM messages LIMIT 1');
+    await db.get('SELECT original_filename FROM messages LIMIT 1');
   } catch (err) {
-    // Колонка filename відсутня
-    await db.exec('ALTER TABLE messages ADD COLUMN filename TEXT;');
+    await db.exec('ALTER TABLE messages ADD COLUMN original_filename TEXT;');
   }
   try {
     await db.get('SELECT mime FROM messages LIMIT 1');
@@ -68,7 +65,7 @@ async function initializeDatabase() {
     await db.exec('ALTER TABLE messages ADD COLUMN mime TEXT;');
   }
 
-  // Перевіряємо, чи існує AI Assistant (id=1)
+  // Створення AI Assistant
   const aiUser = await db.get('SELECT id FROM users WHERE id = 1');
   if (!aiUser) {
     const hashedPassword = await bcrypt.hash('ai_assistant', 10);
