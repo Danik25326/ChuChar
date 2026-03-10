@@ -13,12 +13,16 @@ export default function Chat() {
   const [chatInfo, setChatInfo] = useState(null);
   const [members, setMembers] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
-  const apiUrl = import.meta.env.VITE_API_URL || '';
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(1);
   const fileInputRef = useRef();
   const socketRef = useRef();
   const messagesEndRef = useRef();
+  const messagesContainerRef = useRef();
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
+  const apiUrl = import.meta.env.VITE_API_URL || '';
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -39,18 +43,6 @@ export default function Chat() {
     });
 
     socketRef.current.emit('join-chats', [chatId]);
-
-    const fetchMessages = async () => {
-      try {
-        const res = await axios.get(`/api/chats/${chatId}/messages`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setMessages(res.data);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    fetchMessages();
 
     const fetchChatInfo = async () => {
       try {
@@ -81,9 +73,45 @@ export default function Chat() {
     };
   }, [chatId, navigate]);
 
+  // Завантаження повідомлень з пагінацією
+  const fetchMessages = async (reset = false) => {
+    if (loading || (!hasMore && !reset)) return;
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const currentPage = reset ? 1 : page;
+      const res = await axios.get(`/api/chats/${chatId}/messages?page=${currentPage}&limit=20`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const newMessages = res.data;
+      if (reset) {
+        setMessages(newMessages);
+        setPage(2);
+      } else {
+        setMessages(prev => [...newMessages, ...prev]);
+        setPage(prev => prev + 1);
+      }
+      setHasMore(newMessages.length === 20);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMessages(true);
+  }, [chatId]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const handleScroll = () => {
+    if (messagesContainerRef.current.scrollTop === 0 && hasMore && !loading) {
+      fetchMessages();
+    }
+  };
 
   const sendMessage = (e) => {
     e.preventDefault();
@@ -96,46 +124,42 @@ export default function Chat() {
     setSelectedFile(e.target.files[0]);
   };
 
-const uploadFile = async () => {
-  if (!selectedFile) return;
+  const uploadFile = async () => {
+    if (!selectedFile) return;
 
-  const formData = new FormData();
-  formData.append('file', selectedFile);
+    const formData = new FormData();
+    formData.append('file', selectedFile);
 
-  try {
-    const token = localStorage.getItem('token');
-    const res = await axios.post('/api/upload', formData, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'multipart/form-data'
-      }
-    });
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.post('/api/upload', formData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
 
-    // Визначаємо тип за MIME
-    let fileType = 'file';
-    if (selectedFile.type.startsWith('image/')) fileType = 'image';
-    else if (selectedFile.type.startsWith('video/')) fileType = 'video';
+      // Визначаємо тип за MIME
+      let fileType = 'file';
+      if (selectedFile.type.startsWith('image/')) fileType = 'image';
+      else if (selectedFile.type.startsWith('video/')) fileType = 'video';
 
-    socketRef.current.emit('send-message', {
-      chatId,
-      type: fileType,
-      content: res.data.url,
-      filename: res.data.filename,
-      mime: res.data.mimetype
-    });
+      socketRef.current.emit('send-message', {
+        chatId,
+        type: fileType,
+        content: res.data.url,
+        filename: res.data.filename,
+        mime: res.data.mimetype
+      });
 
-    setSelectedFile(null);
-    fileInputRef.current.value = '';
-  } catch (err) {
-    alert('Помилка завантаження файлу');
-    console.error(err);
-  }
-};
+      setSelectedFile(null);
+      fileInputRef.current.value = '';
+    } catch (err) {
+      alert('Помилка завантаження файлу');
+      console.error(err);
+    }
+  };
 
-// У renderMessage додайте обробку для інших типів:
-const renderMessage = (msg) => {
-  const isMine = msg.userId === user?.id;
-  
   const getFileIcon = (mime) => {
     if (mime?.startsWith('image/')) return '🖼️';
     if (mime?.startsWith('video/')) return '🎥';
@@ -146,47 +170,49 @@ const renderMessage = (msg) => {
     return '📎';
   };
 
-  return (
-    <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-xs ${isMine ? 'chat-bubble-out' : 'chat-bubble-in'}`}>
-        {!isMine && <p className="text-xs text-neon-blue mb-1">{msg.username}</p>}
-        
-        {msg.type === 'text' && <p className="break-words">{msg.content}</p>}
-        
-        {msg.type === 'image' && (
-          <img 
-            src={`${apiUrl}${msg.content}`} 
-            alt="image" 
-            className="max-w-full rounded cursor-pointer"
-            onClick={() => window.open(`${apiUrl}${msg.content}`, '_blank')}
-          />
-        )}
-        
-        {msg.type === 'video' && (
-          <video controls className="max-w-full rounded">
-            <source src={`${apiUrl}${msg.content}`} />
-          </video>
-        )}
-        
-        {msg.type === 'file' && (
-          <a 
-            href={`${apiUrl}${msg.content}`} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center space-x-2 p-2 bg-neon-card rounded hover:bg-neon-hover transition"
-          >
-            <span className="text-2xl">{getFileIcon(msg.mime)}</span>
-            <span className="truncate">{msg.filename || 'Файл'}</span>
-          </a>
-        )}
-        
-        <p className="text-xs text-right text-neon-text-secondary mt-1">
-          {format(new Date(msg.createdAt), 'HH:mm', { locale: uk })}
-        </p>
+  const renderMessage = (msg) => {
+    const isMine = msg.userId === user?.id;
+    return (
+      <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+        <div className={`max-w-xs ${isMine ? 'chat-bubble-out' : 'chat-bubble-in'}`}>
+          {!isMine && <p className="text-xs text-neon-blue mb-1">{msg.username}</p>}
+          
+          {msg.type === 'text' && <p className="break-words">{msg.content}</p>}
+          
+          {msg.type === 'image' && (
+            <img 
+              src={`${apiUrl}${msg.content}`} 
+              alt="Зображення" 
+              className="max-w-full rounded cursor-pointer"
+              onClick={() => window.open(`${apiUrl}${msg.content}`, '_blank')}
+            />
+          )}
+          
+          {msg.type === 'video' && (
+            <video controls className="max-w-full rounded">
+              <source src={`${apiUrl}${msg.content}`} />
+            </video>
+          )}
+          
+          {msg.type === 'file' && (
+            <a 
+              href={`${apiUrl}${msg.content}`} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center space-x-2 p-2 bg-neon-card rounded hover:bg-neon-hover transition"
+            >
+              <span className="text-2xl">{getFileIcon(msg.mime)}</span>
+              <span className="truncate">{msg.filename || 'Файл'}</span>
+            </a>
+          )}
+          
+          <p className="text-xs text-right text-neon-text-secondary mt-1">
+            {format(new Date(msg.createdAt), 'HH:mm', { locale: uk })}
+          </p>
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   return (
     <div className="flex h-screen bg-neon-dark">
@@ -215,7 +241,12 @@ const renderMessage = (msg) => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div 
+          className="flex-1 overflow-y-auto p-4 space-y-3"
+          ref={messagesContainerRef}
+          onScroll={handleScroll}
+        >
+          {loading && <div className="text-center text-neon-text-secondary">Завантаження...</div>}
           {messages.map(renderMessage)}
           <div ref={messagesEndRef} />
         </div>
@@ -247,7 +278,7 @@ const renderMessage = (msg) => {
               type="file"
               ref={fileInputRef}
               onChange={handleFileSelect}
-              accept="image/*,video/*"
+              accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
               className="hidden"
               id="file-upload"
             />
