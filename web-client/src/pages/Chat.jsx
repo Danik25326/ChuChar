@@ -11,6 +11,7 @@ export default function Chat() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [chatInfo, setChatInfo] = useState(null);
+  const [members, setMembers] = useState([]);
   const socketRef = useRef();
   const messagesEndRef = useRef();
   const { user } = useContext(AuthContext);
@@ -20,12 +21,18 @@ export default function Chat() {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    socketRef.current = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000', {
+    const socketUrl = import.meta.env.VITE_SOCKET_URL || window.location.origin;
+    socketRef.current = io(socketUrl, {
       auth: { token }
     });
 
     socketRef.current.on('new-message', (message) => {
       setMessages(prev => [...prev, message]);
+    });
+
+    socketRef.current.on('error', (err) => {
+      console.error('Socket error:', err);
+      alert(err);
     });
 
     socketRef.current.emit('join-chats', [chatId]);
@@ -54,6 +61,18 @@ export default function Chat() {
     };
     fetchChatInfo();
 
+    const fetchMembers = async () => {
+      try {
+        const res = await axios.get(`/api/chats/${chatId}/members`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setMembers(res.data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchMembers();
+
     return () => {
       socketRef.current?.disconnect();
     };
@@ -80,7 +99,9 @@ export default function Chat() {
         </div>
         <div className="p-4">
           <h2 className="font-semibold text-lg">{chatInfo?.name || `Чат #${chatId}`}</h2>
-          <p className="text-sm text-neon-text-secondary">Учасники: ...</p>
+          <p className="text-sm text-neon-text-secondary">
+            Учасники: {members.map(m => m.username).join(', ')}
+          </p>
         </div>
       </div>
 
