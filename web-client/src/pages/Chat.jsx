@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useContext } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import axios from 'axios';
@@ -30,9 +30,25 @@ export default function Chat() {
   const navigate = useNavigate();
   const apiUrl = import.meta.env.VITE_API_URL || '';
 
+  // Безпечне форматування часу
+  const formatTimeSafe = (dateString) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '';
+      return format(date, 'HH:mm', { locale: uk });
+    } catch (e) {
+      console.error('Помилка форматування часу:', e);
+      return '';
+    }
+  };
+
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token) return;
+    if (!token) {
+      navigate('/login');
+      return;
+    }
 
     const socketUrl = import.meta.env.VITE_SOCKET_URL || window.location.origin;
     socketRef.current = io(socketUrl, {
@@ -46,7 +62,6 @@ export default function Chat() {
     socketRef.current.on('error', (err) => {
       console.error('Socket error:', err);
       setError(err);
-      alert(err);
     });
 
     socketRef.current.emit('join-chats', [chatId]);
@@ -182,7 +197,6 @@ export default function Chat() {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         const file = new File([audioBlob], `voice-${Date.now()}.webm`, { type: 'audio/webm' });
         setSelectedFile(file);
-        // Автоматично завантажуємо після зупинки
         await uploadFile();
       };
 
@@ -232,7 +246,8 @@ export default function Chat() {
       mime: msg.mime || '',
       content: msg.content || '',
       type: msg.type || 'text',
-      username: msg.username || 'Користувач'
+      username: msg.username || 'Користувач',
+      createdAt: msg.createdAt || null
     };
 
     const isMine = safeMsg.userId === user?.id;
@@ -281,7 +296,7 @@ export default function Chat() {
           )}
           
           <p className="text-xs text-right text-neon-text-secondary mt-1">
-            {safeMsg.createdAt ? format(new Date(safeMsg.createdAt), 'HH:mm', { locale: uk }) : ''}
+            {formatTimeSafe(safeMsg.createdAt)}
           </p>
         </div>
       </div>
