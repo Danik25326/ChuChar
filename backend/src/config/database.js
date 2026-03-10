@@ -47,11 +47,26 @@ async function initializeDatabase() {
       user_id INTEGER NOT NULL,
       content TEXT NOT NULL,
       type TEXT DEFAULT 'text',
+      filename TEXT,
+      mime TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(chat_id) REFERENCES chats(id) ON DELETE CASCADE,
       FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
     );
   `);
+
+  // Якщо таблиця messages вже існувала без колонок filename/mime – додамо їх
+  try {
+    await db.get('SELECT filename FROM messages LIMIT 1');
+  } catch (err) {
+    // Колонка filename відсутня
+    await db.exec('ALTER TABLE messages ADD COLUMN filename TEXT;');
+  }
+  try {
+    await db.get('SELECT mime FROM messages LIMIT 1');
+  } catch (err) {
+    await db.exec('ALTER TABLE messages ADD COLUMN mime TEXT;');
+  }
 
   // Перевіряємо, чи існує AI Assistant (id=1)
   const aiUser = await db.get('SELECT id FROM users WHERE id = 1');
