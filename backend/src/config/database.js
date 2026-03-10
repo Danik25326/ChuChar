@@ -16,6 +16,7 @@ async function initializeDatabase() {
     driver: sqlite3.Database
   });
 
+  // Створюємо таблиці, якщо їх немає
   await db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,6 +46,7 @@ async function initializeDatabase() {
       chat_id INTEGER NOT NULL,
       user_id INTEGER NOT NULL,
       content TEXT NOT NULL,
+      type TEXT DEFAULT 'text',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(chat_id) REFERENCES chats(id) ON DELETE CASCADE,
       FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
