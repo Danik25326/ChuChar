@@ -1,6 +1,7 @@
 const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
 const path = require('path');
+const bcrypt = require('bcryptjs');
 
 async function initializeDatabase() {
   const db = await open({
@@ -8,7 +9,6 @@ async function initializeDatabase() {
     driver: sqlite3.Database
   });
 
-  // Створення таблиць
   await db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,6 +43,15 @@ async function initializeDatabase() {
       FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
     );
   `);
+
+  const aiUser = await db.get('SELECT id FROM users WHERE id = 1');
+  if (!aiUser) {
+    const hashedPassword = await bcrypt.hash('ai_assistant', 10);
+    await db.run(
+      'INSERT INTO users (id, username, password) VALUES (1, ?, ?)',
+      'AI Assistant', hashedPassword
+    );
+  }
 
   console.log('Database initialized');
   return db;
