@@ -15,7 +15,7 @@ const { authenticateToken } = require('./middleware/auth');
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
-  cors: { origin: '*' }
+  cors: { origin: '*' } // В продакшені краще обмежити доменами
 });
 
 app.use(cors());
@@ -27,6 +27,7 @@ app.use(express.urlencoded({ extended: true }));
     const db = await initializeDatabase();
     console.log('Database connected');
 
+    // Додаємо db до запитів (через middleware)
     app.use((req, res, next) => {
       req.db = db;
       next();
@@ -34,7 +35,7 @@ app.use(express.urlencoded({ extended: true }));
 
     app.use('/api/auth', authRoutes);
     app.use('/api/users', userRoutes);
-    app.use('/api/chats', chatRoutes);
+    use('/api/chats', chatRoutes);
 
     app.get('/api/auth/me', authenticateToken, (req, res) => {
       res.json({ user: req.user });
@@ -44,11 +45,13 @@ app.use(express.urlencoded({ extended: true }));
       res.send('ChuChar backend is running!');
     });
 
-    app.use(express.static(path.join(__dirname, '../../web-client/dist')));
+    // Роздача статики веб-клієнта (якщо зібрано)
+    const clientBuildPath = path.join(__dirname, '../../web-client/dist');
+    app.use(express.static(clientBuildPath));
 
     app.get('*', (req, res) => {
       if (!req.path.startsWith('/api')) {
-        res.sendFile(path.join(__dirname, '../../web-client/dist/index.html'));
+        res.sendFile(path.join(clientBuildPath, 'index.html'));
       } else {
         res.status(404).json({ error: 'API route not found' });
       }
@@ -61,7 +64,7 @@ app.use(express.urlencoded({ extended: true }));
       console.log(`Server running on port ${PORT}`);
     });
   } catch (err) {
-    console.error('Failed to initialize database:', err);
+    console.error('Failed to initialize:', err);
     process.exit(1);
   }
 })();
