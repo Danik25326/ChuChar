@@ -13,6 +13,7 @@ export default function Chat() {
   const [chatInfo, setChatInfo] = useState(null);
   const [members, setMembers] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
+  const apiUrl = import.meta.env.VITE_API_URL || '';
   const fileInputRef = useRef();
   const socketRef = useRef();
   const messagesEndRef = useRef();
@@ -135,19 +136,19 @@ export default function Chat() {
           {msg.type === 'text' && (
             <p className="break-words">{msg.content}</p>
           )}
-          {msg.type === 'image' && (
-            <img 
-              src={msg.content} 
-              alt="Зображення" 
-              className="max-w-full rounded cursor-pointer"
-              onClick={() => window.open(msg.content, '_blank')}
-            />
-          )}
-          {msg.type === 'video' && (
-            <video controls className="max-w-full rounded">
-              <source src={msg.content} />
-            </video>
-          )}
+{msg.type === 'image' && (
+  <img 
+    src={`${apiUrl}${msg.content}`} 
+    alt="Зображення" 
+    className="max-w-full rounded cursor-pointer"
+    onClick={() => window.open(`${apiUrl}${msg.content}`, '_blank')}
+  />
+)}
+{msg.type === 'video' && (
+  <video controls className="max-w-full rounded">
+    <source src={`${apiUrl}${msg.content}`} />
+  </video>
+)}
           
           <p className="text-xs text-right text-neon-text-secondary mt-1">
             {format(new Date(msg.createdAt), 'HH:mm', { locale: uk })}
