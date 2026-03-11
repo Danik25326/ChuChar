@@ -4,7 +4,7 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
 });
 
-async function getAIResponse(chatId, userMessage, db, members) {
+async function getAIResponse(chatId, message, db, members) {
   try {
     // Отримуємо останні повідомлення для контексту
     const history = await db.all(
@@ -18,13 +18,13 @@ async function getAIResponse(chatId, userMessage, db, members) {
     history.reverse();
 
     // Формуємо повідомлення для Groq
-    const messages = [
-      { role: "system", content: "Ти корисний асистент у месенджері. Відповідай мовою користувача. Якщо тобі надіслали файл, згадай про це у відповіді." }
-    ];
+    const systemMessage = "Ти корисний асистент у месенджері. Відповідай мовою користувача. Якщо тобі надіслали файл, проаналізуй його за наявною інформацією. Для зображень опиши, що на них зображено.";
+    const messages = [{ role: "system", content: systemMessage }];
 
     history.forEach(msg => {
       let content = msg.content;
       if (msg.type !== 'text') {
+        // Для нетекстових повідомлень передаємо тип та назву
         content = `[${msg.type}] ${msg.original_filename || 'файл'}`;
       }
       messages.push({
@@ -34,10 +34,16 @@ async function getAIResponse(chatId, userMessage, db, members) {
     });
 
     // Додаємо поточне повідомлення
-    messages.push({ role: "user", content: userMessage });
+    let userContent;
+    if (message.type !== 'text') {
+      userContent = `[${message.type}] ${message.original_filename || 'файл'}`;
+    } else {
+      userContent = message.content;
+    }
+    messages.push({ role: "user", content: userContent });
 
     const completion = await groq.chat.completions.create({
-      model: "openai/gpt-oss-120b", // або інша модель Groq
+      model: "openai/gpt-4-vision-preview", // або модель з vision, якщо доступна
       messages: messages,
       temperature: 0.7,
       max_tokens: 500
@@ -45,7 +51,6 @@ async function getAIResponse(chatId, userMessage, db, members) {
 
     const aiContent = completion.choices[0].message.content;
 
-    // Зберігаємо відповідь AI в БД
     const result = await db.run(
       'INSERT INTO messages (chat_id, user_id, content, type) VALUES (?, ?, ?, ?)',
       chatId, 1, aiContent, 'text'
