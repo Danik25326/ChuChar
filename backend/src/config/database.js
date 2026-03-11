@@ -20,6 +20,7 @@ async function initializeDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
+      avatar TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -53,7 +54,13 @@ async function initializeDatabase() {
     );
   `);
 
-  // Додаємо відсутні колонки, якщо таблиця вже існувала
+  // Додаємо відсутні колонки
+  try {
+    await db.get('SELECT avatar FROM users LIMIT 1');
+  } catch (err) {
+    await db.exec('ALTER TABLE users ADD COLUMN avatar TEXT;');
+  }
+
   try {
     await db.get('SELECT original_filename FROM messages LIMIT 1');
   } catch (err) {
@@ -65,13 +72,13 @@ async function initializeDatabase() {
     await db.exec('ALTER TABLE messages ADD COLUMN mime TEXT;');
   }
 
-  // Створення AI Assistant
+  // Створення AI Assistant, якщо не існує
   const aiUser = await db.get('SELECT id FROM users WHERE id = 1');
   if (!aiUser) {
     const hashedPassword = await bcrypt.hash('ai_assistant', 10);
     await db.run(
-      'INSERT INTO users (id, username, password) VALUES (1, ?, ?)',
-      'AI Assistant', hashedPassword
+      'INSERT INTO users (id, username, password, avatar) VALUES (1, ?, ?, ?)',
+      'AI Assistant', hashedPassword, '/uploads/ai-avatar.png' // дефолтна аватарка
     );
   }
 
