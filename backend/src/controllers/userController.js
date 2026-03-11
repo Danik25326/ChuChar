@@ -3,7 +3,7 @@ async function getUser(req, res) {
   const db = req.db;
 
   try {
-    const user = await db.get('SELECT id, username, created_at FROM users WHERE id = ?', id);
+    const user = await db.get('SELECT id, username, avatar, created_at FROM users WHERE id = ?', id);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -20,9 +20,13 @@ async function searchUsers(req, res) {
 
   const db = req.db;
   try {
+    // Регістронезалежний пошук, виключаємо поточного користувача
+    const currentUserId = req.user.id;
     const users = await db.all(
-      'SELECT id, username FROM users WHERE username LIKE ? LIMIT 10',
-      [`%${q}%`]
+      `SELECT id, username, avatar FROM users 
+       WHERE username LIKE ? COLLATE NOCASE AND id != ?
+       LIMIT 20`,
+      [`%${q}%`, currentUserId]
     );
     res.json(users);
   } catch (err) {
@@ -31,4 +35,21 @@ async function searchUsers(req, res) {
   }
 }
 
-module.exports = { getUser, searchUsers };
+async function updateAvatar(req, res) {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+  const db = req.db;
+  const userId = req.user.id;
+  const avatarUrl = `/uploads/${req.file.filename}`;
+
+  try {
+    await db.run('UPDATE users SET avatar = ? WHERE id = ?', avatarUrl, userId);
+    res.json({ avatar: avatarUrl });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+module.exports = { getUser, searchUsers, updateAvatar };
