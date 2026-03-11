@@ -46,7 +46,6 @@ export const ThemeProvider = ({ children }) => {
 
   useEffect(() => {
     localStorage.setItem('theme', JSON.stringify(theme));
-    // Застосовуємо класи до body
     document.body.className = theme.bg + ' ' + theme.text;
   }, [theme]);
 
