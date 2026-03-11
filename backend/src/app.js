@@ -1,62 +1,67 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Chats from './pages/Chats';
-import Chat from './pages/Chat';
-import Profile from './pages/Profile';
-import { AuthContext } from './context/AuthContext';
-import { ThemeProvider } from './context/ThemeContext';
-import axios from 'axios';
+require('dotenv').config();
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const cors = require('cors');
+const path = require('path');
 
-axios.defaults.baseURL = import.meta.env.VITE_API_URL || '';
+const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes');
+const chatRoutes = require('./routes/chatRoutes');
+const { initializeDatabase } = require('./config/database');
+const { setupSocket } = require('./sockets/chatSocket');
+const { authenticateToken } = require('./middleware/auth');
+const { upload, uploadFile } = require('./controllers/uploadController');
 
-function App() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: { origin: '*' }
+});
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      axios.get('/api/auth/me', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-        .then(res => {
-          setUser(res.data.user);
-        })
-        .catch(() => {
-          localStorage.removeItem('token');
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
-  }, []);
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-neon-dark">
-        <div className="text-neon-blue text-xl">Завантаження...</div>
-      </div>
-    );
+(async () => {
+  try {
+    const db = await initializeDatabase();
+    console.log('Database connected');
+
+    app.use((req, res, next) => {
+      req.db = db;
+      next();
+    });
+
+    app.use('/api/auth', authRoutes);
+    app.use('/api/users', userRoutes);
+    app.use('/api/chats', chatRoutes);
+
+    app.post('/api/upload', authenticateToken, upload.single('file'), uploadFile);
+
+    app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+    app.get('/api/auth/me', authenticateToken, (req, res) => {
+      res.json({ user: req.user });
+    });
+
+    app.get('/api/health', (req, res) => {
+      res.send('ChuChar backend is running!');
+    });
+
+    // Простий маршрут для кореня
+    app.get('/', (req, res) => {
+      res.send('ChuChar API. Використовуйте /api/...');
+    });
+
+    setupSocket(io, db);
+
+    const PORT = process.env.PORT || 3000;
+    server.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error('Failed to initialize:', err);
+    process.exit(1);
   }
-
-  return (
-    <ThemeProvider>
-      <AuthContext.Provider value={{ user, setUser }}>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={!user ? <Login /> : <Navigate to="/chats" />} />
-            <Route path="/register" element={!user ? <Register /> : <Navigate to="/chats" />} />
-            <Route path="/chats" element={user ? <Chats /> : <Navigate to="/login" />} />
-            <Route path="/chats/:chatId" element={user ? <Chat /> : <Navigate to="/login" />} />
-            <Route path="/profile" element={user ? <Profile /> : <Navigate to="/login" />} />
-            <Route path="*" element={<Navigate to="/chats" />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthContext.Provider>
-    </ThemeProvider>
-  );
-}
-
-export default App;
+})();
