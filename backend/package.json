@@ -1,6 +1,8 @@
 {
   "name": "chuchar-backend",
   "version": "1.0.0",
+  "private": true,
+  "type": "module",
   "description": "Backend for ChuChar messenger",
   "main": "src/app.js",
   "scripts": {
