@@ -5,7 +5,7 @@ import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import Avatar from '../components/Avatar';
-import { AudioPlayer } from '../components/AudioPlayer';
+import AudioPlayer  from '../components/AudioPlayer';
 import { format } from 'date-fns';
 import { uk } from 'date-fns/locale';
 
