@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import Avatar from '../components/Avatar';
+import Avatar from '../%20components/Avatar';
 
 export default function Profile() {
   const { user, setUser } = useContext(AuthContext);
