@@ -2,6 +2,8 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import Avatar from '../components/Avatar';
 import { formatDistanceToNow } from 'date-fns';
 import { uk } from 'date-fns/locale';
 
@@ -14,6 +16,7 @@ export default function Chats() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { user } = useContext(AuthContext);
+  const { theme, themes, changeTheme } = useTheme();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -40,19 +43,28 @@ export default function Chats() {
         return;
       }
 
-      const chatsWithLastMsg = await Promise.all(res.data.map(async (chat) => {
+      // Отримуємо деталі користувачів для особистих чатів
+      const chatsWithDetails = await Promise.all(res.data.map(async (chat) => {
+        // Отримуємо останнє повідомлення
         try {
           const msgRes = await axios.get(`/api/chats/${chat.id}/messages?limit=1`, {
             headers: { Authorization: `Bearer ${token}` }
           });
           const lastMsg = msgRes.data && msgRes.data.length > 0 ? msgRes.data[msgRes.data.length - 1] : null;
+          
+          // Для особистого чату визначаємо співрозмовника
+          let otherUser = null;
+          if (!chat.is_group && chat.other_usernames) {
+            // Тут потрібно було б отримати повну інформацію про іншого користувача, але для простоти залишимо так
+            // Можна зробити окремий запит
+          }
           return { ...chat, lastMessage: lastMsg };
         } catch {
           return { ...chat, lastMessage: null };
         }
       }));
       
-      setChats(chatsWithLastMsg);
+      setChats(chatsWithDetails);
     } catch (err) {
       console.error('Помилка завантаження чатів:', err);
       setError('Не вдалося завантажити чати. Спробуйте пізніше.');
@@ -78,8 +90,7 @@ export default function Chats() {
       const res = await axios.get(`/api/users/search?q=${query}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const filtered = res.data.filter(u => u.id !== user?.id);
-      setSearchResults(filtered);
+      setSearchResults(res.data);
     } catch (err) {
       console.error(err);
     }
@@ -112,14 +123,13 @@ export default function Chats() {
       if (isNaN(date.getTime())) return '';
       return formatDistanceToNow(date, { addSuffix: true, locale: uk });
     } catch (e) {
-      console.error('Помилка форматування дати:', e);
       return '';
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-neon-dark">
+      <div className={`flex items-center justify-center h-screen ${theme.bg}`}>
         <div className="text-neon-blue text-xl">Завантаження...</div>
       </div>
     );
@@ -127,7 +137,7 @@ export default function Chats() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-screen bg-neon-dark">
+      <div className={`flex items-center justify-center h-screen ${theme.bg}`}>
         <div className="text-center">
           <p className="text-red-500 mb-4">{error}</p>
           <button 
@@ -142,18 +152,28 @@ export default function Chats() {
   }
 
   return (
-    <div className="flex h-screen bg-neon-dark">
-      <div className="w-80 border-r border-neon-border flex flex-col">
-        <div className="p-4 border-b border-neon-border flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-neon-blue">ChuChar</h1>
-          <button
-            onClick={() => setShowModal(true)}
-            className="text-neon-blue hover:text-white transition"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-          </button>
+    <div className={`flex h-screen ${theme.bg} ${theme.text}`}>
+      <div className={`w-80 border-r ${theme.border} flex flex-col`}>
+        <div className={`p-4 border-b ${theme.border} flex justify-between items-center`}>
+          <h1 className={`text-2xl font-bold ${theme.primary}`}>ChuChar</h1>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => navigate('/profile')}
+              className="text-neon-blue hover:text-white transition"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setShowModal(true)}
+              className="text-neon-blue hover:text-white transition"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -166,15 +186,16 @@ export default function Chats() {
               <Link
                 key={chat.id}
                 to={`/chats/${chat.id}`}
-                className="block p-4 hover:bg-neon-hover transition border-b border-neon-border"
+                className={`block p-4 hover:bg-opacity-10 transition border-b ${theme.border}`}
+                style={{ backgroundColor: 'rgba(0,0,0,0.2)' }}
               >
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 rounded-full bg-neon-blue flex items-center justify-center text-white font-bold text-lg">
-                    {chat.name ? chat.name[0].toUpperCase() : '#'}
-                  </div>
+                  <Avatar user={chat.otherUser} size="w-12 h-12" />
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-baseline">
-                      <h3 className="font-semibold truncate">{chat.name || `Чат #${chat.id}`}</h3>
+                      <h3 className="font-semibold truncate">
+                        {chat.displayName}
+                      </h3>
                       {chat.lastMessage && (
                         <span className="text-xs text-neon-text-secondary">
                           {formatDate(chat.lastMessage.createdAt)}
@@ -184,7 +205,7 @@ export default function Chats() {
                     <p className="text-sm text-neon-text-secondary truncate">
                       {chat.lastMessage ? (
                         <>
-                          <span className="text-neon-text-primary">{chat.lastMessage.username}:</span> {chat.lastMessage.content}
+                          <span className={theme.primary}>{chat.lastMessage.username}:</span> {chat.lastMessage.content}
                         </>
                       ) : (
                         'Немає повідомлень'
@@ -197,21 +218,20 @@ export default function Chats() {
           )}
         </div>
 
-        <div className="p-4 border-t border-neon-border flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-full bg-neon-hover flex items-center justify-center text-neon-blue font-bold">
-            {user?.username?.[0]?.toUpperCase() || '?'}
-          </div>
+        <div className={`p-4 border-t ${theme.border} flex items-center space-x-3`}>
+          <Avatar user={user} size="w-10 h-10" />
           <div className="flex-1 min-w-0">
-            <p className="font-medium truncate">{user?.username || 'Користувач'}</p>
+            <p className="font-medium truncate">{user?.username}</p>
             <p className="text-xs text-neon-text-secondary">Онлайн</p>
           </div>
         </div>
       </div>
 
+      {/* Модальне вікно створення чату */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-neon-card p-6 rounded-lg w-96 border border-neon-border">
-            <h2 className="text-xl font-bold mb-4 text-neon-blue">Новий чат</h2>
+          <div className={`${theme.card} p-6 rounded-lg w-96 border ${theme.border}`}>
+            <h2 className={`text-xl font-bold mb-4 ${theme.primary}`}>Новий чат</h2>
             <input
               type="text"
               placeholder="Пошук користувачів..."
@@ -225,13 +245,14 @@ export default function Chats() {
                 <div
                   key={u.id}
                   onClick={() => setSelectedUser(u)}
-                  className={`p-2 cursor-pointer rounded ${
+                  className={`p-2 cursor-pointer rounded flex items-center space-x-2 ${
                     selectedUser?.id === u.id 
                       ? 'bg-neon-blue text-white' 
-                      : 'hover:bg-neon-hover'
+                      : 'hover:bg-opacity-10'
                   }`}
                 >
-                  {u.username}
+                  <Avatar user={u} size="w-8 h-8" />
+                  <span>{u.username}</span>
                 </div>
               ))}
             </div>
@@ -242,7 +263,7 @@ export default function Chats() {
                   setSelectedUser(null);
                   setSearchQuery('');
                 }} 
-                className="px-4 py-2 bg-neon-hover rounded"
+                className="px-4 py-2 bg-gray-600 rounded"
               >
                 Скасувати
               </button>
