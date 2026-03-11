@@ -4,48 +4,12 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Chats from './pages/Chats';
 import Chat from './pages/Chat';
+import Profile from './pages/Profile';
 import { AuthContext } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import axios from 'axios';
 
-// Встановлюємо базовий URL для всіх axios-запитів
 axios.defaults.baseURL = import.meta.env.VITE_API_URL || '';
-
-// Компонент для перехоплення помилок (Error Boundary)
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    console.error('Помилка додатку:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen bg-neon-dark flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-2xl text-red-500 mb-4">Щось пішло не так</h1>
-            <p className="text-neon-text-secondary mb-4">{this.state.error?.message}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="bg-neon-blue px-4 py-2 rounded text-white"
-            >
-              Перезавантажити
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
 
 function App() {
   const [user, setUser] = useState(null);
@@ -78,7 +42,7 @@ function App() {
   }
 
   return (
-    <ErrorBoundary>
+    <ThemeProvider>
       <AuthContext.Provider value={{ user, setUser }}>
         <BrowserRouter>
           <Routes>
@@ -86,11 +50,12 @@ function App() {
             <Route path="/register" element={!user ? <Register /> : <Navigate to="/chats" />} />
             <Route path="/chats" element={user ? <Chats /> : <Navigate to="/login" />} />
             <Route path="/chats/:chatId" element={user ? <Chat /> : <Navigate to="/login" />} />
+            <Route path="/profile" element={user ? <Profile /> : <Navigate to="/login" />} />
             <Route path="*" element={<Navigate to="/chats" />} />
           </Routes>
         </BrowserRouter>
       </AuthContext.Provider>
-    </ErrorBoundary>
+    </ThemeProvider>
   );
 }
 
