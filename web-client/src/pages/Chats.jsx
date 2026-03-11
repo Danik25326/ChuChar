@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import Avatar from '../components/Avatar';
+import { Avatar } from '../components/Avatar';
 import { formatDistanceToNow } from 'date-fns';
 import { uk } from 'date-fns/locale';
 
