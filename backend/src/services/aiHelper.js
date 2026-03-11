@@ -6,7 +6,6 @@ const groq = new Groq({
 
 async function getAIResponse(chatId, message, db, members) {
   try {
-    // Отримуємо останні повідомлення для контексту
     const history = await db.all(
       `SELECT m.*, u.username FROM messages m
        JOIN users u ON m.user_id = u.id
@@ -17,14 +16,12 @@ async function getAIResponse(chatId, message, db, members) {
     );
     history.reverse();
 
-    // Формуємо повідомлення для Groq
     const systemMessage = "Ти корисний асистент у месенджері. Відповідай мовою користувача. Якщо тобі надіслали файл, проаналізуй його за наявною інформацією. Для зображень опиши, що на них зображено.";
     const messages = [{ role: "system", content: systemMessage }];
 
     history.forEach(msg => {
       let content = msg.content;
       if (msg.type !== 'text') {
-        // Для нетекстових повідомлень передаємо тип та назву
         content = `[${msg.type}] ${msg.original_filename || 'файл'}`;
       }
       messages.push({
@@ -33,7 +30,6 @@ async function getAIResponse(chatId, message, db, members) {
       });
     });
 
-    // Додаємо поточне повідомлення
     let userContent;
     if (message.type !== 'text') {
       userContent = `[${message.type}] ${message.original_filename || 'файл'}`;
@@ -42,8 +38,10 @@ async function getAIResponse(chatId, message, db, members) {
     }
     messages.push({ role: "user", content: userContent });
 
+    console.log('📤 Sending to Groq:', messages); // додатковий лог
+
     const completion = await groq.chat.completions.create({
-      model: "openai/gpt-4-vision-preview", // або модель з vision, якщо доступна
+      model: "mixtral-8x7b-32768", // змінено модель
       messages: messages,
       temperature: 0.7,
       max_tokens: 500
@@ -66,7 +64,11 @@ async function getAIResponse(chatId, message, db, members) {
       createdAt: new Date().toISOString()
     };
   } catch (error) {
-    console.error('AI error:', error);
+    console.error('❌ AI error details:', {
+      message: error.message,
+      status: error.status,
+      data: error.response?.data
+    });
     return {
       id: Date.now(),
       chatId,
