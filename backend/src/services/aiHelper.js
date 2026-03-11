@@ -41,7 +41,7 @@ async function getAIResponse(chatId, message, db, members) {
     console.log('📤 Sending to Groq:', messages); // додатковий лог
 
     const completion = await groq.chat.completions.create({
-      model: "mixtral-8x7b-32768", // змінено модель
+      model: "llama-3.3-70b-versatile", // змінено модель
       messages: messages,
       temperature: 0.7,
       max_tokens: 500
