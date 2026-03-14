@@ -2,7 +2,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
-const { extractText } = require('pptx2txt');
+const textract = require('textract');
 const OpenAI = require('openai');
 
 const openai = new OpenAI({
@@ -30,10 +30,14 @@ async function extractTextFromFile(filePath, mimeType) {
       return result.value;
     }
     
-    // PowerPoint презентації
+    // PowerPoint презентації - використовуємо textract
     if (mimeType.includes('presentation') || mimeType.includes('powerpoint')) {
-      const text = await extractText(filePath);
-      return text;
+      return new Promise((resolve, reject) => {
+        textract.fromFileWithPath(filePath, (error, text) => {
+          if (error) reject(error);
+          else resolve(text);
+        });
+      });
     }
     
     // Текстові файли
