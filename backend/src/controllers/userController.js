@@ -20,13 +20,12 @@ async function searchUsers(req, res) {
 
   const db = req.db;
   try {
-    // Регістронезалежний пошук, виключаємо поточного користувача
-    const currentUserId = req.user.id;
+    // SQLite: використовуємо LIKE з COLLATE NOCASE для нечутливості до регістру
     const users = await db.all(
       `SELECT id, username, avatar FROM users 
        WHERE username LIKE ? COLLATE NOCASE AND id != ?
        LIMIT 20`,
-      [`%${q}%`, currentUserId]
+      [`%${q}%`, req.user.id]
     );
     res.json(users);
   } catch (err) {
