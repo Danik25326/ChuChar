@@ -22,9 +22,9 @@
     "openai": "^4.20.0",
     "pdf-parse": "^1.1.1",
     "mammoth": "^1.6.0",
-    "pptx2txt": "^1.0.0",
     "node-fetch": "^2.7.0",
-    "form-data": "^4.0.0"
+    "form-data": "^4.0.0",
+    "textract": "^2.5.0"
   },
   "devDependencies": {
     "nodemon": "^2.0.20"
